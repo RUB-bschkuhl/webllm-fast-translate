@@ -19,6 +19,12 @@ A privacy-focused Chrome extension that provides AI-powered translation between 
 - ⚡ **Fast**: Optimized models for quick translation (1-3GB cache after first download)
 - 🎯 **Offline Ready**: Works without internet after initial model download
 
+## Persian Translation Status ⚠️
+
+**Current Limitation**: Full Persian translation capability requires specialized models with robust Persian language support. The currently available WebLLM models (Llama 3.2, Phi 3.5) have limited Persian capabilities, which may result in inconsistent translation quality for Persian text.
+
+**Future Development**: We are actively working on integrating Persian-optimized models into the WebLLM ecosystem to provide high-quality Persian translations. This will significantly improve the accuracy and fluency of Persian ↔ English and Persian ↔ German translations.
+
 ## How It Works
 
 1. **First Use**: Download and cache an AI model (Llama 3.2 1B or Phi 3.5 Mini)
