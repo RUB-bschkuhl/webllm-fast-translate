@@ -1,2 +1,4 @@
 /node_modules
 .DS_Store
+/my-chrome-extension/node_modules
+/my-chrome-extension/dist/

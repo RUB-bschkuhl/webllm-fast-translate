@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebLLM Static Chat</title>
+    <title>WebLLM Translation Tool</title>
 
     <!-- Required headers for WebLLM -->
     <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
     <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
 
-    <link rel="stylesheet" href="popup.css">
+    <link rel="stylesheet" href="styles/popup.css">
 </head>
 
 <body>
-    <div class="container" style="min-width: 600px; min-height: 800px;">
+    <div class="container">
         <div class="header">
-            <h1>🤖 WebLLM Chat</h1>
-            <p>Local AI Chat - Runs entirely in your browser</p>
+            <h1>🌐 Smart Translation Tool</h1>
+            <p>AI-powered translation between Persian, English & German</p>
         </div>
         
         <div class="disclaimer">
-            ⚠️ First time setup may download up to 2GB of model data. Requires modern browser with WebGPU support.
+            ⚠️ First time setup downloads up to 2GB of model data (cached for future use). Models marked with 💾 are already cached.
         </div>
         
         <div class="model-selector">
@@ -31,23 +31,29 @@
                 <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">Phi 3.5 Mini (Compact, ~2.2GB)</option>
             </select>
             <button id="loadModelBtn">Load Model</button>
+            <button id="clearCacheBtn" title="Clear cached models">🗑️</button>
         </div>
         
         <div class="status loading" id="status">
-            Select and load a model to start chatting
+            Select and load a model to start translating
         </div>
         
-        <div class="chat-container">
-            <div class="messages" id="messages">
-                <div class="message assistant">
-                    👋 Welcome to WebLLM Chat! This AI runs completely in your browser - no data is sent to any server. 
-                    <br><br>
-                    <strong>To get started:</strong>
-                    <br>1. Select a model above
-                    <br>2. Click "Load Model" 
-                    <br>3. Wait for download to complete
-                    <br>4. Start chatting!
-                </div>
+        <div class="translation-container">
+            <div class="input-section">
+                <label for="inputText">Enter text to translate:</label>
+                <textarea 
+                    id="inputText" 
+                    class="input-textarea"
+                    placeholder="Load a model first, then enter text in Persian (فارسی), English, or German (Deutsch)..."
+                    disabled
+                ></textarea>
+                <div class="keyboard-hint">💡 Press <kbd>Enter</kbd> to translate, <kbd>Shift+Enter</kbd> for new line</div>
+                <button id="translateButton" disabled>🌐 Translate</button>
+            </div>
+            
+            <div class="language-detection" id="languageDetection">
+                <strong>Detected language:</strong> <span id="detectedLanguage"></span>
+                <div id="debugInfo" style="display: none; font-size: 9px; color: #888; margin-top: 3px;"></div>
             </div>
             
             <div class="loading-indicator" id="loadingIndicator">
@@ -57,187 +63,15 @@
                     <div class="dot"></div>
                 </div>
             </div>
-        </div>
-        
-        <div class="input-area">
-            <div class="input-container">
-                <input 
-                    type="text" 
-                    id="messageInput" 
-                    placeholder="Load a model first to start chatting..." 
-                    disabled
-                >
-                <button id="sendButton" disabled>Send</button>
+            
+            <div class="translations-section" id="translationsSection">
+                <h3 style="margin: 0; color: #333; font-size: 18px;">📝 Translations:</h3>
+                <div id="translationResults"></div>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        // Import WebLLM from CDN
-        import * as webllm from "https://esm.run/@mlc-ai/web-llm";
-
-        class StaticWebLLMChat {
-            constructor() {
-                this.engine = null;
-                this.isLoading = false;
-                this.conversationHistory = [];
-                this.initializeElements();
-                this.setupEventListeners();
-            }
-
-            initializeElements() {
-                this.statusEl = document.getElementById('status');
-                this.messagesEl = document.getElementById('messages');
-                this.messageInput = document.getElementById('messageInput');
-                this.sendButton = document.getElementById('sendButton');
-                this.loadingIndicator = document.getElementById('loadingIndicator');
-                this.modelSelect = document.getElementById('modelSelect');
-                this.loadModelBtn = document.getElementById('loadModelBtn');
-            }
-
-            setupEventListeners() {
-                this.loadModelBtn.addEventListener('click', () => this.initializeWebLLM());
-                this.sendButton.addEventListener('click', () => this.sendMessage());
-                this.messageInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        this.sendMessage();
-                    }
-                });
-            }
-
-            updateStatus(message, type = 'loading') {
-                this.statusEl.textContent = message;
-                this.statusEl.className = `status ${type}`;
-            }
-
-            async initializeWebLLM() {
-                const selectedModel = this.modelSelect.value;
-                
-                try {
-                    this.updateStatus('Initializing WebLLM engine...', 'loading');
-                    this.loadModelBtn.disabled = true;
-                    this.modelSelect.disabled = true;
-                    
-                    // Create new engine instance
-                    this.engine = new webllm.MLCEngine();
-                    
-                    // Load the selected model with progress callback
-                    await this.engine.reload(selectedModel, {
-                        progress_callback: (progress) => {
-                            const percent = Math.round(progress * 100);
-                            this.updateStatus(`Loading ${selectedModel}: ${percent}%`, 'loading');
-                        }
-                    });
-
-                    this.updateStatus(`✅ ${selectedModel} loaded successfully!`, 'ready');
-                    this.messageInput.disabled = false;
-                    this.sendButton.disabled = false;
-                    this.messageInput.placeholder = 'Type your message here...';
-                    this.messageInput.focus();
-
-                    // Add welcome message
-                    this.addMessage('🎉 Great! I\'m now ready to chat. What would you like to talk about?', 'assistant');
-
-                } catch (error) {
-                    console.error('Failed to initialize WebLLM:', error);
-                    this.updateStatus(`❌ Error: ${error.message}`, 'error');
-                    this.loadModelBtn.disabled = false;
-                    this.modelSelect.disabled = false;
-                    
-                    // Add error message to chat
-                    this.addMessage(`Sorry, I couldn't load the model. Error: ${error.message}. Please try refreshing the page or selecting a different model.`, 'assistant');
-                }
-            }
-
-            addMessage(content, role) {
-                const messageEl = document.createElement('div');
-                messageEl.className = `message ${role}`;
-                
-                // Simple markdown-like formatting
-                const formattedContent = content
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/\n/g, '<br>');
-                
-                messageEl.innerHTML = formattedContent;
-                this.messagesEl.appendChild(messageEl);
-                this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
-                
-                // Store in conversation history
-                this.conversationHistory.push({ role, content });
-                
-                // Keep conversation history manageable (last 10 exchanges)
-                if (this.conversationHistory.length > 20) {
-                    this.conversationHistory = this.conversationHistory.slice(-20);
-                }
-            }
-
-            showLoading(show) {
-                this.loadingIndicator.style.display = show ? 'block' : 'none';
-                if (show) {
-                    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
-                }
-            }
-
-            async sendMessage() {
-                if (!this.engine || this.isLoading || !this.messageInput.value.trim()) {
-                    return;
-                }
-
-                const userMessage = this.messageInput.value.trim();
-                this.messageInput.value = '';
-                this.isLoading = true;
-                this.sendButton.disabled = true;
-                this.messageInput.disabled = true;
-
-                // Add user message to chat
-                this.addMessage(userMessage, 'user');
-                this.showLoading(true);
-
-                try {
-                    // Prepare conversation context (last few messages)
-                    const messages = this.conversationHistory.slice(-10);
-                    
-                    // Create chat completion
-                    const completion = await this.engine.chat.completions.create({
-                        messages: messages,
-                        temperature: 0.8,
-                        max_tokens: 1024,
-                        top_p: 0.9,
-                    });
-
-                    const assistantMessage = completion.choices[0].message.content;
-                    this.showLoading(false);
-                    this.addMessage(assistantMessage, 'assistant');
-
-                } catch (error) {
-                    console.error('Error generating response:', error);
-                    this.showLoading(false);
-                    this.addMessage('Sorry, I encountered an error generating a response. Please try again or refresh the page if the problem persists.', 'assistant');
-                } finally {
-                    this.isLoading = false;
-                    this.sendButton.disabled = false;
-                    this.messageInput.disabled = false;
-                    this.messageInput.focus();
-                }
-            }
-        }
-
-        // Initialize the chat app when DOM is loaded
-        document.addEventListener('DOMContentLoaded', () => {
-            new StaticWebLLMChat();
-        });
-
-        // Initialize immediately if DOM is already loaded
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                new StaticWebLLMChat();
-            });
-        } else {
-            new StaticWebLLMChat();
-        }
-    </script>
+    <script type="module" src="popup.js"></script>
 </body>
 
 </html>
